@@ -1,0 +1,586 @@
+import javax.swing.*;
+import javax.swing.border.EmptyBorder;
+import javax.swing.table.DefaultTableModel;
+import javax.swing.table.DefaultTableCellRenderer;
+import java.awt.*;
+import java.io.File;
+
+public class InventoryManagementFrame extends JFrame {
+    private final InventoryManagementSystem ims;
+    private DefaultTableModel tableModel;
+    private JTable inventoryTable;
+    private JTextField idField, nameField, descriptionField, categoryField, priceField, quantityField, searchField;
+    private final Image backgroundImage;
+    private JButton exportButton, importButton;
+
+    public InventoryManagementFrame() {
+        ims = new InventoryManagementSystem();
+        backgroundImage = loadImageFromResources("background.jpg");
+        initializeUI();
+    }
+
+    private Image loadImageFromResources(String filename) {
+        try {
+            java.net.URL imageURL = getClass().getResource("/images/" + filename);
+            if (imageURL != null) {
+                return Toolkit.getDefaultToolkit().getImage(imageURL);
+            } else {
+                return Toolkit.getDefaultToolkit().getImage("images/" + filename);
+            }
+        } catch (Exception e) {
+            System.out.println("Image not found: " + filename);
+            return null;
+        }
+    }
+
+    private ImageIcon createScaledIcon(String filename, int width, int height) {
+        try {
+            java.net.URL imageURL = getClass().getResource("/images/" + filename);
+            if (imageURL != null) {
+                ImageIcon originalIcon = new ImageIcon(imageURL);
+                Image scaledImage = originalIcon.getImage().getScaledInstance(width, height, Image.SCALE_SMOOTH);
+                return new ImageIcon(scaledImage);
+            } else {
+                ImageIcon originalIcon = new ImageIcon("images/" + filename);
+                Image scaledImage = originalIcon.getImage().getScaledInstance(width, height, Image.SCALE_SMOOTH);
+                return new ImageIcon(scaledImage);
+            }
+        } catch (Exception e) {
+            System.out.println("Icon not found: " + filename);
+            return null;
+        }
+    }
+
+    private void initializeUI() {
+        setTitle("Inventory Management System - CSV Database with Low Stock Alerts");
+        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        setSize(1200, 800);
+        setLocationRelativeTo(null);
+
+        JPanel mainPanel = new JPanel() {
+            @Override
+            protected void paintComponent(Graphics g) {
+                super.paintComponent(g);
+                if (backgroundImage != null) {
+                    g.drawImage(backgroundImage, 0, 0, getWidth(), getHeight(), this);
+                } else {
+                    Graphics2D g2d = (Graphics2D) g;
+                    Color color1 = new Color(74, 144, 226);
+                    Color color2 = new Color(106, 216, 203);
+                    GradientPaint gp = new GradientPaint(0, 0, color1, getWidth(), getHeight(), color2);
+                    g2d.setPaint(gp);
+                    g2d.fillRect(0, 0, getWidth(), getHeight());
+                    
+                }
+            }
+        };
+        mainPanel.setLayout(new BorderLayout(15, 15));
+        mainPanel.setBorder(new EmptyBorder(20, 20, 20, 20));
+
+        JPanel headerPanel = createHeaderPanel();
+        JPanel contentPanel = new JPanel(new BorderLayout(10, 10));
+        contentPanel.setOpaque(false);
+
+        JPanel inputPanel = createInputPanel();
+        JPanel tablePanel = createTablePanel();
+        JPanel buttonPanel = createButtonPanel();
+
+        contentPanel.add(inputPanel, BorderLayout.WEST);
+        contentPanel.add(tablePanel, BorderLayout.CENTER);
+        contentPanel.add(buttonPanel, BorderLayout.SOUTH);
+
+        mainPanel.add(headerPanel, BorderLayout.NORTH);
+        mainPanel.add(contentPanel, BorderLayout.CENTER);
+        setContentPane(mainPanel);
+
+        // Check for low stock alerts on startup
+        checkInitialLowStockAlerts();
+    }
+
+    private void checkInitialLowStockAlerts() {
+        if (ims.hasLowStockAlerts()) {
+            SwingUtilities.invokeLater(() -> {
+                JOptionPane.showMessageDialog(this,
+                    "Low Stock Alert!\n\nThere are " + ims.getLowStockCount() + 
+                    " products with low inventory.\n\nCheck products with quantity ≤ " + 
+                    ims.getLowStockThreshold() + " units.",
+                    "Inventory Warning", JOptionPane.WARNING_MESSAGE);
+            });
+        }
+    }
+
+    private JPanel createHeaderPanel() {
+        JPanel headerPanel = new JPanel(new BorderLayout());
+        headerPanel.setOpaque(false);
+        headerPanel.setBorder(new EmptyBorder(0, 0, 20, 0));
+        
+        JPanel logoPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        logoPanel.setOpaque(false);
+        ImageIcon logoIcon = createScaledIcon("logo.png", 200,120);
+        JLabel logoLabel = new JLabel(logoIcon);
+        logoPanel.add(logoLabel);
+        
+        JLabel titleLabel = new JLabel("INVENTORY MANAGEMENT SYSTEM", JLabel.CENTER);
+        titleLabel.setFont(new Font("Segoe UI", Font.BOLD, 32));
+        titleLabel.setForeground(new Color(25, 25, 112));
+        titleLabel.setBorder(new EmptyBorder(10, 0, 10, 0));
+        
+        headerPanel.add(logoPanel, BorderLayout.WEST);
+        headerPanel.add(titleLabel, BorderLayout.CENTER);
+        
+        return headerPanel;
+    }
+
+    private JPanel createInputPanel() {
+        JPanel panel = new JPanel(new GridBagLayout());
+        panel.setBorder(BorderFactory.createTitledBorder(
+            BorderFactory.createLineBorder(new Color(70, 130, 180), 2),
+            "INVENTORY INFORMATION",
+            javax.swing.border.TitledBorder.CENTER,
+            javax.swing.border.TitledBorder.TOP,
+            new Font("Segoe UI", Font.BOLD, 16),
+            new Color(70, 130, 180)
+        ));
+        panel.setBackground(new Color(255, 255, 255, 230));
+        panel.setOpaque(true);
+        panel.setPreferredSize(new Dimension(400, 400));
+
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.insets = new Insets(10, 10, 10, 10);
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        gbc.weightx = 1.0;
+
+        gbc.gridx = 0; gbc.gridy = 0;
+        panel.add(createStyledLabel("Product ID:"), gbc);
+        gbc.gridx = 1;
+        idField = createStyledTextField();
+        panel.add(idField, gbc);
+
+        gbc.gridx = 0; gbc.gridy = 1;
+        panel.add(createStyledLabel("Product Name:"), gbc);
+        gbc.gridx = 1;
+        nameField = createStyledTextField();
+        panel.add(nameField, gbc);
+
+        gbc.gridx = 0; gbc.gridy = 2;
+        panel.add(createStyledLabel("Description:"), gbc);
+        gbc.gridx = 1;
+        descriptionField = createStyledTextField();
+        panel.add(descriptionField, gbc);
+
+        gbc.gridx = 0; gbc.gridy = 3;
+        panel.add(createStyledLabel("Category:"), gbc);
+        gbc.gridx = 1;
+        categoryField = createStyledTextField();
+        panel.add(categoryField, gbc);
+
+        gbc.gridx = 0; gbc.gridy = 4;
+        panel.add(createStyledLabel("Price (₱):"), gbc);
+        gbc.gridx = 1;
+        priceField = createStyledTextField();
+        panel.add(priceField, gbc);
+
+        gbc.gridx = 0; gbc.gridy = 5;
+        panel.add(createStyledLabel("Quantity:"), gbc);
+        gbc.gridx = 1;
+        quantityField = createStyledTextField();
+        panel.add(quantityField, gbc);
+
+        return panel;
+    }
+
+    private JPanel createTablePanel() {
+    JPanel panel = new JPanel(new BorderLayout());
+    panel.setBorder(BorderFactory.createTitledBorder(
+        BorderFactory.createLineBorder(new Color(70, 130, 180), 2),
+        "INVENTORY RECORDS - Connected to CSV Database",
+        javax.swing.border.TitledBorder.CENTER,
+        javax.swing.border.TitledBorder.TOP,
+        new Font("Segoe UI", Font.BOLD, 16),
+        new Color(70, 130, 180)
+    ));
+    panel.setBackground(new Color(255, 255, 255, 230));
+    panel.setOpaque(true);
+
+    String[] columns = {"ID", "Name", "Description", "Category", "Price", "Quantity"};
+    tableModel = new DefaultTableModel(columns, 0) {
+        @Override
+        public boolean isCellEditable(int row, int column) {
+            return false;
+        }
+    };
+
+    inventoryTable = new JTable(tableModel);
+    inventoryTable.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+    inventoryTable.setRowHeight(30);
+    inventoryTable.setSelectionBackground(new Color(70, 130, 180));
+    inventoryTable.setSelectionForeground(Color.WHITE);
+    inventoryTable.setBackground(Color.WHITE);
+    inventoryTable.setGridColor(new Color(200, 200, 200));
+    
+    // Style table header
+    inventoryTable.getTableHeader().setFont(new Font("Segoe UI", Font.BOLD, 14));
+    inventoryTable.getTableHeader().setBackground(new Color(70, 130, 180));
+    inventoryTable.getTableHeader().setForeground(Color.WHITE);
+
+    // ===== ADD DOUBLE-CLICK LISTENER RIGHT HERE =====
+    // Add mouse listener for double-click
+    inventoryTable.addMouseListener(new java.awt.event.MouseAdapter() {
+        @Override
+        public void mouseClicked(java.awt.event.MouseEvent evt) {
+            if (evt.getClickCount() == 2) { // Double-click
+                int row = inventoryTable.getSelectedRow();
+                if (row != -1) {
+                    loadProductFromTable(row);
+                }
+            }
+        }
+    });
+    // ===== END OF DOUBLE-CLICK LISTENER =====
+
+    JScrollPane scrollPane = new JScrollPane(inventoryTable);
+    scrollPane.setOpaque(false);
+    scrollPane.getViewport().setOpaque(false);
+    
+    // Search panel with icon
+    JPanel searchPanel = new JPanel(new BorderLayout(10, 10));
+    searchPanel.setOpaque(false);
+    
+    JLabel searchLabel = createStyledLabel("Search Product by ID:");
+    searchLabel.setFont(new Font("Segoe UI", Font.BOLD, 14));
+    searchPanel.add(searchLabel, BorderLayout.WEST);
+    
+    searchField = createStyledTextField();
+    searchPanel.add(searchField, BorderLayout.CENTER);
+    
+    JButton searchButton = createStyledButtonWithIcon(" SEARCH", new Color(34, 139, 34), "search_icon.png");
+    searchButton.addActionListener(e -> searchProduct());
+    searchPanel.add(searchButton, BorderLayout.EAST);
+    searchPanel.setBorder(new EmptyBorder(10, 0, 15, 0));
+
+    panel.add(searchPanel, BorderLayout.NORTH);
+    panel.add(scrollPane, BorderLayout.CENTER);
+
+    // Add CSV file status label
+    JLabel csvStatusLabel = new JLabel("CSV Database: " + ims.getCSVFilePath() + " | Total Products: " + ims.getProductCount());
+    csvStatusLabel.setFont(new Font("Segoe UI", Font.ITALIC, 11));
+    csvStatusLabel.setForeground(new Color(100, 100, 100));
+    csvStatusLabel.setBorder(new EmptyBorder(5, 10, 5, 10));
+    panel.add(csvStatusLabel, BorderLayout.SOUTH);
+
+    ims.updateTableModel(tableModel);
+
+    return panel;
+}
+
+    private JPanel createButtonPanel() {
+        JPanel panel = new JPanel(new FlowLayout(FlowLayout.CENTER, 15, 15));
+        panel.setOpaque(false);
+        panel.setBorder(new EmptyBorder(15, 0, 15, 0));
+
+        JButton addButton = createStyledButtonWithIcon(" ADD PRODUCT", new Color(34, 139, 34), "add_icon.png");
+        addButton.setPreferredSize(new Dimension(150, 50));
+        addButton.addActionListener(e -> addProduct());
+
+        JButton removeButton = createStyledButtonWithIcon(" REMOVE", new Color(220, 53, 69), "delete_icon.png");
+        removeButton.setPreferredSize(new Dimension(150, 50));
+        removeButton.addActionListener(e -> removeProduct());
+
+        JButton clearButton = createStyledButtonWithIcon(" CLEAR FIELDS", new Color(255, 193, 7), "clear_icon.png");
+        clearButton.setPreferredSize(new Dimension(150, 50));
+        clearButton.setForeground(Color.BLACK);
+        clearButton.addActionListener(e -> clearFields());
+
+        JButton refreshButton = createStyledButtonWithIcon(" REFRESH", new Color(23, 162, 184), "refresh_icon.png");
+        refreshButton.setPreferredSize(new Dimension(150, 50));
+        refreshButton.addActionListener(e -> refreshInventory());
+
+        exportButton = createStyledButtonWithIcon(" EXPORT", new Color(111, 66, 193), "export_icon.png");
+        exportButton.setPreferredSize(new Dimension(150, 50));
+        exportButton.addActionListener(e -> exportToCSV());
+
+        importButton = createStyledButtonWithIcon(" IMPORT ", new Color(193, 66, 161), "import_icon.png");
+        importButton.setPreferredSize(new Dimension(160, 50));
+        importButton.addActionListener(e -> importFromCSV());
+
+        panel.add(addButton);
+        panel.add(removeButton);
+        panel.add(clearButton);
+        panel.add(refreshButton);
+        panel.add(exportButton);
+        panel.add(importButton);
+
+        return panel;
+    }
+
+    private JLabel createStyledLabel(String text) {
+        JLabel label = new JLabel(text);
+        label.setFont(new Font("Segoe UI", Font.BOLD, 12));
+        label.setForeground(new Color(70, 130, 180));
+        return label;
+    }
+
+    private JTextField createStyledTextField() {
+        JTextField field = new JTextField();
+        field.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+        field.setPreferredSize(new Dimension(200, 35));
+        field.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createLineBorder(new Color(70, 130, 180), 1),
+            BorderFactory.createEmptyBorder(8, 10, 8, 10)
+        ));
+        field.setBackground(Color.WHITE);
+        return field;
+    }
+
+    private JButton createStyledButtonWithIcon(String text, Color color, String iconFilename) {
+        JButton button = new JButton(text);
+        button.setFont(new Font("Segoe UI", Font.BOLD, 13));
+        button.setForeground(Color.WHITE);
+        button.setBackground(color);
+        button.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createLineBorder(color.darker(), 2),
+            BorderFactory.createEmptyBorder(12, 15, 12, 15)
+        ));
+        button.setFocusPainted(false);
+        button.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        
+        ImageIcon icon = createScaledIcon(iconFilename, 20, 20);
+        if (icon != null) {
+            button.setIcon(icon);
+            button.setHorizontalTextPosition(SwingConstants.RIGHT);
+            button.setIconTextGap(8);
+        }
+        
+        return button;
+    }
+
+    private void addProduct() {
+    try {
+        String id = idField.getText().trim();
+        String name = nameField.getText().trim();
+        String description = descriptionField.getText().trim();
+        String category = categoryField.getText().trim();
+        String priceText = priceField.getText().trim();
+        String quantityText = quantityField.getText().trim();
+        
+        if (id.isEmpty() || name.isEmpty() || description.isEmpty() || category.isEmpty() || priceText.isEmpty() || quantityText.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "Please fill in all fields.", "Error", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+
+        double price = Double.parseDouble(priceText);
+        int quantity = Integer.parseInt(quantityText);
+
+        if (price < 0 || quantity < 0) {
+            JOptionPane.showMessageDialog(this, "Price and quantity must be positive numbers", "Error", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+
+        // Check if we're updating an existing product or adding a new one
+        Product existingProduct = ims.findProductById(id);
+        
+        if (existingProduct != null) {
+            // UPDATE EXISTING PRODUCT
+            // Check if name is being changed to another existing product's name
+            if (!existingProduct.getName().equals(name) && ims.isProductNameExists(name)) {
+                JOptionPane.showMessageDialog(this, "Product name already exists!", "Error", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+            
+            // Update the existing product
+            existingProduct.setName(name);
+            existingProduct.setDescription(description);
+            existingProduct.setCategory(category);
+            existingProduct.setPrice(price);
+            existingProduct.setQuantity(quantity);
+            
+            ims.updateProduct(existingProduct); // This will save to CSV
+            ims.updateTableModel(tableModel);
+            clearFields();
+            
+            JOptionPane.showMessageDialog(this, 
+                "Product updated successfully!\nNew quantity: " + quantity, 
+                "Update Success", JOptionPane.INFORMATION_MESSAGE);
+                
+        } else {
+            // ADD NEW PRODUCT
+            Product product = new Product(id, name, description, category, price, quantity);
+            if (ims.addProduct(product)) {
+                ims.updateTableModel(tableModel);
+                clearFields();
+                JOptionPane.showMessageDialog(this, 
+                    "Product added successfully!\nTotal products: " + ims.getProductCount(), 
+                    "Success", JOptionPane.INFORMATION_MESSAGE);
+            } else {
+                JOptionPane.showMessageDialog(this, "Product ID or Name already exists!", "Error", JOptionPane.ERROR_MESSAGE);
+            }
+        }
+        
+    } catch (NumberFormatException ex) {
+        JOptionPane.showMessageDialog(this, "Please enter valid price and quantity", "Error", JOptionPane.ERROR_MESSAGE);
+    }
+}
+
+    private void removeProduct() {
+        String id = idField.getText().trim();
+        if (id.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "Please enter a Product ID to remove from inventory.", "Error", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+
+        int confirm = JOptionPane.showConfirmDialog(this, 
+            "Are you sure you want to remove product " + id + " from inventory?", 
+            "Confirm Removal", JOptionPane.YES_NO_OPTION);
+        
+        if (confirm == JOptionPane.YES_OPTION) {
+            if (ims.removeProduct(id)) {
+                refreshInventory();
+                clearFields();
+                JOptionPane.showMessageDialog(this, 
+                    "Product removed successfully from inventory!\nTotal products: " + ims.getProductCount(), 
+                    "Success", JOptionPane.INFORMATION_MESSAGE);
+            } else {
+                JOptionPane.showMessageDialog(this, "Product not found in inventory!", "Error", JOptionPane.ERROR_MESSAGE);
+            }
+        }
+    }
+
+    private void searchProduct() {
+        String id = searchField.getText().trim();
+        if (id.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "Please enter a Product ID to search in inventory.", "Error", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+
+        Product product = ims.findProductById(id);
+        if (product != null) {
+            idField.setText(product.getId());
+            nameField.setText(product.getName());
+            descriptionField.setText(product.getDescription());
+            categoryField.setText(product.getCategory());
+            priceField.setText(String.valueOf(product.getPrice()));
+            quantityField.setText(String.valueOf(product.getQuantity()));
+            
+            // Show warning if product is low stock
+            if (product.getQuantity() <= ims.getLowStockThreshold()) {
+                JOptionPane.showMessageDialog(this, 
+                    "Product found - LOW STOCK ALERT!\n\nProduct: " + product.getName() +
+                    "\nCurrent Quantity: " + product.getQuantity() +
+                    "\nThreshold: " + ims.getLowStockThreshold() + " units", 
+                    "Low Stock Warning", JOptionPane.WARNING_MESSAGE);
+            } else {
+                JOptionPane.showMessageDialog(this, "Product found in inventory and details loaded!", "Success", JOptionPane.INFORMATION_MESSAGE);
+            }
+        } else {
+            JOptionPane.showMessageDialog(this, "Product not found in inventory!", "Error", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    private void refreshInventory() {
+        ims.updateTableModel(tableModel);
+        JOptionPane.showMessageDialog(InventoryManagementFrame.this, 
+            "Inventory records refreshed!\nTotal products: " + ims.getProductCount() + 
+            "\nLow stock items: " + ims.getLowStockCount(), 
+            "Success", JOptionPane.INFORMATION_MESSAGE);
+    }
+
+    private void clearFields() {
+        idField.setText("");
+        nameField.setText("");
+        descriptionField.setText("");
+        categoryField.setText("");
+        priceField.setText("");
+        quantityField.setText("");
+        searchField.setText("");
+        idField.requestFocus();
+    }
+
+    private void exportToCSV() {
+        try {
+            ims.exportToCSV();
+            JOptionPane.showMessageDialog(this, 
+                "Inventory data exported to CSV successfully!\nFile: " + ims.getCSVFilePath() + 
+                "\nTotal products: " + ims.getProductCount(), 
+                "Export Successful", JOptionPane.INFORMATION_MESSAGE);
+        } catch (HeadlessException e) {
+            JOptionPane.showMessageDialog(this, 
+                "Error exporting to CSV: " + e.getMessage(), 
+                "Export Error", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    private void importFromCSV() {
+        JFileChooser fileChooser = new JFileChooser();
+        fileChooser.setDialogTitle("Select CSV File to Import");
+        fileChooser.setFileFilter(new javax.swing.filechooser.FileNameExtensionFilter(
+            "CSV Files (*.csv)", "csv"));
+        
+        int result = fileChooser.showOpenDialog(this);
+        if (result == JFileChooser.APPROVE_OPTION) {
+            File selectedFile = fileChooser.getSelectedFile();
+            int confirm = JOptionPane.showConfirmDialog(this,
+                "This will replace all current inventory data with data from:\n" + 
+                selectedFile.getName() + "\n\nAre you sure?",
+                "Confirm Import", JOptionPane.YES_NO_OPTION);
+            
+            if (confirm == JOptionPane.YES_OPTION) {
+                try {
+                    ims.importFromCSV(selectedFile.getAbsolutePath());
+                    refreshInventory();
+                    JOptionPane.showMessageDialog(this,
+                        "Inventory data imported successfully from CSV!\nTotal products loaded: " + ims.getProductCount(),
+                        "Import Successful", JOptionPane.INFORMATION_MESSAGE);
+                } catch (HeadlessException e) {
+                    JOptionPane.showMessageDialog(this,
+                        "Error importing from CSV: " + e.getMessage(),
+                        "Import Error", JOptionPane.ERROR_MESSAGE);
+                }
+            }
+        }
+    }
+    
+    private void loadProductFromTable(int row) {
+    String id = tableModel.getValueAt(row, 0).toString();
+    String name = tableModel.getValueAt(row, 1).toString();
+    String description = tableModel.getValueAt(row, 2).toString();
+    String category = tableModel.getValueAt(row, 3).toString();
+    String price = tableModel.getValueAt(row, 4).toString().replace("₱", "").trim();
+    String quantity = tableModel.getValueAt(row, 5).toString();
+    
+    idField.setText(id);
+    nameField.setText(name);
+    descriptionField.setText(description);
+    categoryField.setText(category);
+    priceField.setText(price);
+    quantityField.setText(quantity);
+    
+    // Optional: Show adjustment dialog automatically
+    String newQuantity = JOptionPane.showInputDialog(this, 
+        "Adjust quantity for " + name + ":", quantity);
+    
+    if (newQuantity != null && !newQuantity.trim().isEmpty()) {
+        try {
+            int adjustedQuantity = Integer.parseInt(newQuantity.trim());
+            if (adjustedQuantity < 0) {
+                JOptionPane.showMessageDialog(this, "Quantity must be positive", "Error", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+            
+            quantityField.setText(String.valueOf(adjustedQuantity));
+            // User can now click "ADD PRODUCT" to save the updated quantity
+            
+        } catch (NumberFormatException ex) {
+            JOptionPane.showMessageDialog(this, "Please enter a valid number", "Error", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+}
+    
+    
+
+    public static void main(String[] args) {
+        SwingUtilities.invokeLater(() -> {
+            InventoryManagementFrame frame = new InventoryManagementFrame();
+            frame.setVisible(true);
+        });
+    }
+}

@@ -1,0 +1,56 @@
+import java.util.*;
+
+public class LowStockAlertManager {
+    private int lowStockThreshold;
+    private final PriorityQueue<Product> lowStockQueue;
+    
+    public LowStockAlertManager() {
+        this(10); // Default threshold: 10 units
+    }
+    
+    public LowStockAlertManager(int threshold) {
+        this.lowStockThreshold = threshold;
+        this.lowStockQueue = new PriorityQueue<>(
+            Comparator.comparingInt(Product::getQuantity)
+        );
+    }
+    
+    // Add product to low stock monitoring
+    public void monitorProduct(Product product) {
+        if (product.getQuantity() <= lowStockThreshold) {
+            lowStockQueue.remove(product);
+            lowStockQueue.offer(product);
+        } else {
+            lowStockQueue.remove(product);
+        }
+    }
+    
+    // Remove product from monitoring
+    public void removeFromMonitoring(Product product) {
+        lowStockQueue.remove(product);
+    }
+    
+    // Check if a product is low stock
+    public boolean isLowStock(Product product) {
+        return product.getQuantity() <= lowStockThreshold;
+    }
+    
+    // Check if there are any low stock alerts
+    public boolean hasLowStockAlerts() {
+        return !lowStockQueue.isEmpty();
+    }
+    
+    // Get number of low stock products
+    public int getLowStockCount() {
+        return lowStockQueue.size();
+    }
+    
+    // Clear all alerts
+    public void clearAlerts() {
+        lowStockQueue.clear();
+    }
+    
+    public int getLowStockThreshold() {
+        return lowStockThreshold;
+    }
+}

@@ -1,0 +1,149 @@
+import java.io.*;
+import java.util.*;
+import javax.swing.JOptionPane;
+
+public class CSVDatabaseManager {
+    private final String csvFilePath;
+    private static final String[] CSV_HEADERS = {"ID", "Name", "Description", "Category", "Price", "Quantity",}; // Added Quantity
+    private static final String DELIMITER = ",";
+
+    public CSVDatabaseManager() {
+        this("inventory_data.csv");
+    }
+
+    public CSVDatabaseManager(String filePath) {
+        this.csvFilePath = filePath;
+    }
+
+    public List<Product> loadFromCSV() {
+        List<Product> productList = new ArrayList<>();
+        File file = new File(csvFilePath);
+        
+        if (!file.exists()) {
+            createNewCSVFile();
+            return productList;
+        }
+
+        try (BufferedReader reader = new BufferedReader(new FileReader(csvFilePath))) {
+            String line;
+            boolean isFirstLine = true;
+            
+            while ((line = reader.readLine()) != null) {
+                if (isFirstLine) {
+                    isFirstLine = false;
+                    continue; // Skip header
+                }
+                
+                String[] values = parseCSVLine(line);
+                if (values.length >= 6) {  // Changed from 5 to 6
+                    String id = values[0].trim();
+                    String name = values[1].trim();
+                    String description = values[2].trim();
+                    String category = values[3].trim();
+                    
+                    try {
+                        double price = Double.parseDouble(values[4].trim());
+                        int quantity = Integer.parseInt(values[5].trim());  // Added quantity parsing
+                        
+                        if (!id.isEmpty()) {
+                            Product product = new Product(id, name, description, category, price, quantity);
+                            productList.add(product);
+                        }
+                    } catch (NumberFormatException e) {
+                        System.err.println("Invalid price or quantity format in CSV: " + values[4] + ", " + values[5]);
+                    }
+                }
+            }
+            System.out.println("Inventory data loaded from CSV successfully!");
+
+        } catch (Exception e) {
+            handleCSVError("Error loading from CSV", e);
+        }
+        return productList;
+    }
+
+    public void saveToCSV(List<Product> productList) {
+        try (PrintWriter writer = new PrintWriter(new FileWriter(csvFilePath))) {
+            // Write header
+            writer.println(String.join(DELIMITER, CSV_HEADERS));
+            
+            // Write data
+            for (Product product : productList) {
+                String line = String.join(DELIMITER,
+                    escapeCSVField(product.getId()),
+                    escapeCSVField(product.getName()),
+                    escapeCSVField(product.getDescription()),
+                    escapeCSVField(product.getCategory()),
+                    String.valueOf(product.getPrice()),
+                    String.valueOf(product.getQuantity())// Added quantity
+                );
+                writer.println(line);
+            }
+            System.out.println("Inventory data saved to CSV successfully!");
+
+        } catch (Exception e) {
+            handleCSVError("Error saving to CSV", e);
+        }
+    }
+
+    private String[] parseCSVLine(String line) {
+        List<String> values = new ArrayList<>();
+        StringBuilder currentValue = new StringBuilder();
+        boolean inQuotes = false;
+
+        for (char c : line.toCharArray()) {
+            if (c == '"') {
+                inQuotes = !inQuotes;
+            } else if (c == DELIMITER.charAt(0) && !inQuotes) {
+                values.add(currentValue.toString());
+                currentValue = new StringBuilder();
+            } else {
+                currentValue.append(c);
+            }
+        }
+        values.add(currentValue.toString());
+        
+        return values.toArray(String[]::new);
+    }
+
+    private String escapeCSVField(String field) {
+        if (field.contains(DELIMITER) || field.contains("\"") || field.contains("\n")) {
+            return "\"" + field.replace("\"", "\"\"") + "\"";
+        }
+        return field;
+    }
+
+    private void createNewCSVFile() {
+        try (PrintWriter writer = new PrintWriter(new FileWriter(csvFilePath))) {
+            writer.println(String.join(DELIMITER, CSV_HEADERS));
+            System.out.println("New CSV file created: " + csvFilePath);
+        } catch (Exception e) {
+            handleCSVError("Error creating CSV file", e);
+        }
+    }
+
+    private void handleCSVError(String message, Exception e) {
+        System.err.println(message + ": " + e.getMessage());
+        JOptionPane.showMessageDialog(null, 
+            message + "!\n" + e.getMessage(), 
+            "CSV Error", JOptionPane.ERROR_MESSAGE);
+    }
+
+    public String getCSVFilePath() {
+        return csvFilePath;
+    }
+
+        List<Product> importFromCSV(String filePath) {
+        // Store original file path
+        String originalFilePath = this.csvFilePath;
+        
+        try {
+            // Temporarily use the import file path
+            CSVDatabaseManager tempManager = new CSVDatabaseManager(filePath);
+            return tempManager.loadFromCSV();
+        } catch (Exception e) {
+            handleCSVError("Error importing from CSV", e);
+            return new ArrayList<>();
+        }
+    }
+}

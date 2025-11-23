@@ -1,0 +1,194 @@
+import java.util.*;
+import javax.swing.table.DefaultTableModel;
+import javax.swing.JOptionPane;
+
+public class InventoryManagementSystem {
+    private final java.util.List<Product> inventoryList;
+    private final Map<String, Product> inventoryMap;
+    private final Set<String>nameSet;
+    private final CSVDatabaseManager csvManager;
+    private final LowStockAlertManager alertManager;
+
+    public InventoryManagementSystem() {
+        this("inventory_data.csv");
+    }
+
+    public InventoryManagementSystem(String filePath) {
+        inventoryList = new ArrayList<>();  
+        inventoryMap = new HashMap<>();  
+        nameSet = new HashSet<>();  
+        csvManager = new CSVDatabaseManager(filePath);
+        alertManager = new LowStockAlertManager(10);
+        loadFromCSV();
+    }
+    
+    private void loadFromCSV() {
+        java.util.List<Product> products = csvManager.loadFromCSV();
+        for (Product product : products) {
+            inventoryList.add(product);
+            inventoryMap.put(product.getId(), product);
+            nameSet.add(product.getName());
+            alertManager.monitorProduct(product);
+        }
+    }
+
+    private void saveToCSV() {
+        csvManager.saveToCSV(inventoryList);
+    }
+
+    public boolean addProduct(Product product) {
+        if (inventoryMap.containsKey(product.getId())) {
+            return false;
+        }
+        if (nameSet.contains(product.getName())) {
+                return false;
+            }   
+        
+        inventoryList.add(product);
+        inventoryMap.put(product.getId(), product);
+        nameSet.add(product.getName());
+        alertManager.monitorProduct(product);
+        saveToCSV();
+        
+        // Show alert if low stock
+        if (alertManager.isLowStock(product)) {
+            showLowStockAlert(product);
+        }
+        
+        return true;
+    }
+    
+
+    public boolean removeProduct(String id) {
+        Product product = inventoryMap.get(id);
+        if (product != null) {
+            inventoryList.remove(product);
+            inventoryMap.remove(id);
+            nameSet.remove(product.getName());
+            alertManager.removeFromMonitoring(product);
+            saveToCSV();
+            return true;
+        }
+        return false;
+    }
+
+    public boolean updateProductQuantity(String id, int newQuantity) {
+        Product product = inventoryMap.get(id);
+        if (product != null) {
+            int oldQuantity = product.getQuantity();
+            product.setQuantity(newQuantity);
+            alertManager.monitorProduct(product);
+            
+            // Show alert if stock became low
+            if (oldQuantity > alertManager.getLowStockThreshold() && 
+                newQuantity <= alertManager.getLowStockThreshold()) {
+                showLowStockAlert(product);
+            }
+            
+            saveToCSV();
+            return true;
+        }
+        return false;
+    }
+
+    // Low stock alert methods
+    public boolean hasLowStockAlerts() {
+        return alertManager.hasLowStockAlerts();
+    }
+    
+    public int getLowStockCount() {
+        return alertManager.getLowStockCount();
+    }
+    
+    private void showLowStockAlert(Product product) {
+        String message = String.format(
+            "LOW STOCK ALERT!\n\nProduct: %s (ID: %s)\nCurrent Quantity: %d\nThreshold: %d units",
+            product.getName(), product.getId(), product.getQuantity(), alertManager.getLowStockThreshold()
+        );
+        
+        JOptionPane.showMessageDialog(null, message, "Low Stock Alert", JOptionPane.WARNING_MESSAGE);
+    }
+
+    public Product findProductById(String id) {
+        return inventoryMap.get(id);
+    }
+    
+    public boolean isProductNameExists(String name) {
+    return nameSet.contains(name);
+}
+
+    public java.util.List<Product> getAllProducts() {
+        return new ArrayList<>(inventoryList);
+    }
+
+    public void updateTableModel(DefaultTableModel model) {
+        model.setRowCount(0);
+        for (Product product : inventoryList) {
+            model.addRow(new Object[]{
+                product.getId(),
+                product.getName(),
+                product.getDescription(),
+                product.getCategory(),
+                String.format("₱%.2f", product.getPrice()),
+                product.getQuantity()
+            });
+        }
+    }
+    
+    public void updateProduct(Product updatedProduct) {
+    Product existingProduct = inventoryMap.get(updatedProduct.getId());
+    if (existingProduct != null) {
+        // Remove old name from nameSet
+        nameSet.remove(existingProduct.getName());
+        
+        // Update the product
+        existingProduct.setName(updatedProduct.getName());
+        existingProduct.setDescription(updatedProduct.getDescription());
+        existingProduct.setCategory(updatedProduct.getCategory());
+        existingProduct.setPrice(updatedProduct.getPrice());
+        existingProduct.setQuantity(updatedProduct.getQuantity());
+        
+        // Add new name to nameSet
+        nameSet.add(updatedProduct.getName());
+        
+        saveToCSV(); // Save changes to CSV
+    }
+}
+
+    public void exportToCSV() {
+        saveToCSV();
+    }
+
+    public void importFromCSV(String filePath) {
+        inventoryList.clear();
+        inventoryMap.clear();
+        nameSet.clear();
+        alertManager.clearAlerts();
+        
+        java.util.List<Product> products = csvManager.importFromCSV(filePath);
+        for (Product product : products) {
+            inventoryList.add(product);
+            inventoryMap.put(product.getId(), product);
+            nameSet.add(product.getName());
+            alertManager.monitorProduct(product);
+            
+            // Show alert for low stock items during import
+            if (alertManager.isLowStock(product)) {
+                showLowStockAlert(product);
+            }
+        }
+    }
+
+    public String getCSVFilePath() {
+        return csvManager.getCSVFilePath();
+    }
+
+    public int getProductCount() {
+        return inventoryList.size();
+    }
+    
+    public int getLowStockThreshold() {
+        return alertManager.getLowStockThreshold();
+    }
+
+}
